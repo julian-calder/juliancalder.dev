@@ -8,16 +8,16 @@ p {
   line-height: 1.4;
 }
 
-a,a:link i,i:link{
+a,a:link, .fa-solid-fa-envelope-fa-fw,.fa-solid-fa-envelope-fa-fw:link{
   color: #A0A0A0;
   text-decoration: none;
 }
 
-a:active, a:visited i:active{
+a:active, a:visited, .fa-solid-fa-envelope-fa-fw:active, .fa-solid-fa-envelope-fa-fw:visited{
   color: #808080; 
 }
 
-a:hover i:hover{
+a:hover, .fa-solid-fa-envelope-fa-fw:hover{
   color: #F0F0F0; 
 }
 
@@ -272,7 +272,7 @@ body {
     padding-top: 3px;
     padding-bottom: 3px;
     padding-right: 3px;
-    font-size: 16px;
+    font-size: 14px;
   }
   
   .profile_photo {
