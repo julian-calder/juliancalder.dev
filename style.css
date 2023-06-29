@@ -8,16 +8,16 @@ p {
   line-height: 1.4;
 }
 
-a,a:link, .fa-solid-fa-envelope-fa-fw,.fa-solid-fa-envelope-fa-fw:link{
+a,a:link, .fa,.fa:link{
   color: #A0A0A0;
   text-decoration: none;
 }
 
-a:active, a:visited, .fa-solid-fa-envelope-fa-fw:active, .fa-solid-fa-envelope-fa-fw:visited{
+a:active, a:visited, .fa:active, .fa:visited{
   color: #808080; 
 }
 
-a:hover, .fa-solid-fa-envelope-fa-fw:hover{
+a:hover, .fa:hover{
   color: #F0F0F0; 
 }
 
