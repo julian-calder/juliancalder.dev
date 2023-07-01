@@ -267,5 +267,12 @@ body {
     font-size: 16px;
   }
 
+  .photo_block .caption {
+    font-style: italic;
+    font-size: 14px;
+    text-align: center;
+    padding-top: 10px;
+  }
+
 }
 
