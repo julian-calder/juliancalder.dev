@@ -186,10 +186,11 @@ body {
 
 
 /* mobile */
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 760px) {
   body {
     position: relative;
     align-items: center;
+    width: 90%;
     max-width: 100%;
     font-family: Georgia, 'Times New Roman', Times, serif;
     font-size: 18px;
@@ -239,10 +240,10 @@ body {
   }
   
   .info_board ul {
-    width: 40%;
+    width: 60%;
     margin: 0;
     padding: 0;
-    padding-left: 15px
+    padding-left: 3%
   }
   
   .info_board ul li {
@@ -275,4 +276,3 @@ body {
   }
 
 }
-
