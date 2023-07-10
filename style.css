@@ -124,6 +124,14 @@ body {
   font-variant: small-caps;
 }
 
+.date_entry {
+  font-size: medium;
+}
+
+.job_description_list {
+  
+}
+
 
 /* Tablets */
 @media (max-width: 1200px) {
