@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<head>
+<title>Nextcloud setup and configuration</title>
+<link href="../../../style.css" rel="stylesheet" type="text/css">
+
+<link rel="apple-touch-icon" sizes="180x180" href="../../../apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../../../favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../../../favicon-16x16.png">
+<link rel="manifest" href="../../../site.webmanifest">
+
+<script src="https://kit.fontawesome.com/826a9d4bc6.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+	<div class="navbar">
+		<a href='../../../' class="name_nav"> Julian Calder</a>
+		<ul>
+			<li><a href="../../../about/">About</a></li>
+			<li><a href="../">Blog</a></li>
+			<li><a href="../../../photos/">Photography</a></li>
+			<li><a href="../../../resume.pdf">Resume</a></li>
+		</ul>
+  	</div>
+
+	<div class="content">
+
+        <hr class="section_separator">
+
+        <h2 style="margin-bottom:10px">How to set up and configure your own personal Nextcloud server</h2>
+        <p class="date_entry">January 11, 2025</p>
+
+        <p>
+            In this tutorial, I am going to walk you through how to configure your own personal Nextcloud server,
+            starting from installing Ubuntu server all the way through configuring your router's DNS settings to 
+            allow for access to your data from any device, anywhere.
+        </p>
+
+        <h2>Requirements:</h2>
+
+        <ul style="line-height: 1.6">
+            <li>Linux-compatible device (Raspberry Pi, old laptop, etc.)</li>
+            <li>USB Flashdrive with >8GB capacity</li>
+            <li>Active ethernet port</li>
+            <li>Monitor and keyboard for one-time server setup</li>
+            <li>Access to your router (for configuring ports and request routing)</li>
+            <li>Access to a domain name with configurable DNS settings (Cloudflare is an inexpensive but reliable option)</li>
+        </ul>
+
+        <h2>Step 1: Server installation and configuration</h2>
+
+        <p>
+            The first step in getting your own Nextcloud server up and running is to install your server OS of choice 
+            on whichever system you are planning to use. I opted to use Ubuntu Server 24.04.1 LTS, as this has several
+            years of guaranteed support from Canonical and using Ubuntu gives us native support for the Nextcloud snap, 
+            which greatly simplifies the process of setting up Nextcloud.
+        </p>
+
+        <h3>Install Ubuntu Server ISO</h3>
+
+        <p>
+            The ISO file for Ubuntu Server 24.04.1 LTS can be downloaded from 
+            <a href="https://ubuntu.com/download/server">Canonical's website</a>. If you are going to run your server 
+            on a Raspberry Pi, you will need to make sure you get the ARM-based installer found 
+            <a href="https://ubuntu.com/download/raspberry-pi">here</a>. There are many ways to write this ISO to your
+            flashdrive -- I use Fedora Media Writer, but you can also use <a href="https://rufus.ie/en/">Rufus</a>, or 
+            the Raspberry Pi Imager if you are going to be running your server off of a Pi.
+        </p>
+
+        <p>
+            Most of the OS install is fairly straightforward, you just need to pay attention at the stage when you are 
+            partitioning your storage drives and remember to expand the LVM group to the full size of the disk. You can 
+            read about this on <a href="https://ubuntu.com/tutorials/install-ubuntu-server#10-confirm-partitions">
+            Canonical's Ubuntu Server install page</a>.
+        </p>
+
+        <p>
+            As you are installing the OS, you will also be presented with the option to import ssh keys with GitHub or 
+            Launchpad, which allows the OS to be installed with password authentication disabled (which we will want 
+            to do as soon as possible, for security reasons). It's recommended that you do this, because if you don't
+            <code>cloud-init</code> will override your PasswordAuthentication setting for sshd and you will have to 
+            manually correct its override.
+        </p>
+
+        <p>
+            The final piece of server configuration is to find out what the local IP address is of the server such that 
+            we can access it from other devices on the network, as well as assign it a static IP address from the router
+            when we are port forwarding. To find the IP address, you will use 
+        </p>
+            
+        <code class="code_block">
+            $ ifconfig
+        </code>
+        
+        <p>
+            The output from ifconfig should contain an entry beginning with <code>enp***</code>, indicating the active 
+            ethernet connection. In this entry, you should see an IP address labeled <code>inet</code> in the form 
+            <code>192.168.*.*</code>, referring to the local IPv4 address of your server. Make note of this IP address 
+            for later.
+        </p>
+
+        <p>
+            Once you have completed this initial configuration, you will need a system restart with <code>sudo 
+            reboot</code>. After you have done this, you can unplug any peripherals from your system as the remainder 
+            of the server setup can be done from another machine on your local network (via ssh).
+        </p>
+
+        <h3>Configure access permissions and local firewall</h3>
+        
+        <p>
+            After the initial setup of the server with a username, hostname and password, you should be able to connect 
+            to it via ssh from another device on your network. Ideally, you would have imported the ssh keys such that 
+            no password is required to connect. If you didn't do this, though, it's alright! We'll tackle that now. 
+            Because password authentication is generally less secure than ssh, the very first thing we are going to do 
+            is generate an ssh key on your device and copy it to the server.
+        </p>
+        
+        <p>
+            If you didn't copy your ssh keys from GitHub or Launchpad, we will need to use <code>ssh-copy-id</code> to 
+            do it. If you haven't already generated an ssh key on your system, you can run the following command to do so:
+        </p>
+
+        <code class="code_block">
+            $ ssh-keygen -t rsa -b 4096
+        </code>
+
+        <p>
+            This command generates a 4096-bit ssh key with RSA encryption. You can read more about this command from 
+            the <a href="https://www.ssh.com/academy/ssh/keygen">ssh academy page</a>.
+        </p>
+
+        <p>
+            If you had previously generated an ssh key, you would see it in <code>~/.ssh/id_rsa.pub</code>
+        </p>
+
+        <p>
+            Next, we use <code>ssh-copy-id</code> to send the key to our server. This will require you to connect with 
+            the same username and password that you configured as the administrative account on the server.
+        </p>
+
+        <code class="code_block">
+            $ ssh-copy-id user@hostname
+        </code>
+
+        <p>
+            This will create an <code>authorized_keys</code> file in the <code>~/.ssh/</code> directory on the server, 
+            making the connection from your system to the server. If your system username matches the one configured 
+            as admin on the server, you can omit the <code>user@</code> portion of the command
+        </p>
+
+        <p>
+            Once we have done this, we need to <strong>disable password authentication</strong>. Head to 
+            <code>/etc/ssh/sshd_config</code> in your editor of choice (and sudo) and look for 
+            <code>PasswordAuthentication</code>. Change this from yes to no.
+        </p>
+
+        <p>
+            It is possible that there are other files which are trying to overwrite your <code>sshd_config</code> file. 
+            Specifically, check that <code>/etc/ssh/sshd_config.d/*</code> doesn't have password authentication enabled. 
+            If it does, make sure to set this value to no as well. If you didn't pre-populate an ssh key with GitHub or 
+            Launchpad, <code>cloud-init</code> tends to add an override here to allow password authentication so you 
+            have some way to access the server remotely. Since you've now added an ssh key to this server, you want to 
+            remove this password access override.
+        </p>
+
+        <p>
+            From this point onward, all configuration will be happening on the server (via ssh), *not* on your personal 
+            device (unless otherwise specified).
+        </p>
+
+        <h2>Step 2: Firewall configuration and initial Nextcloud setup</h2>
+
+        <h3>Configuring firewall rules with ufw</h3>
+
+        <p>
+            <code>ufw</code> (uncomplicated firewall) is a popular program which allows the user to manage which ports 
+            on their machine are accessible to other devices on their network. Because Nextcloud operates over the 
+            internet (and utilizes a web interface), it will need access to the http and https ports (80 and 443). 
+            Additionally, since we want our server to be accessible from other devices on the local network and enabling
+            <code>ufw</code> would protect all unspecified ports, we also need to allow connections via ssh (port 22) 
+            such that we don't kick ourselves off of the server unintentionally.
+        </p>
+
+        <p>
+            <code>ufw</code> is installed (but inactive) by default on Ubuntu, and you can check your status with:
+        </p>
+
+        <code class="code_block">
+            $ sudo ufw status
+        </code>
+
+        <p>
+            Once you have verified that <code>ufw</code> is installed, we will add the rules to allow ssh, http and https:
+        </p>
+
+        <code class="code_block">
+            $ sudo ufw allow ssh <br>
+            $ sudo ufw allow http <br>
+            $ sudo ufw allow https
+        </code>
+
+        <p>
+            Once we have configured the firewall, we need to enable it and ensure that it is working properly:
+        </p>
+
+        <code class="code_block">
+            $ sudo ufw enable <br>
+            $ sudo ufw reload <br>
+            $ sudo ufw status
+        </code>
+
+        <p>
+            You should then see an output indicating that your firewall is active and ports 22, 80, and 443 are open.
+        </p>
+
+        <h3>Initializing Nextcloud admin account</h3>
+
+        <p>
+            We will be installing the <a href="https://github.com/nextcloud-snap/nextcloud-snap">Nextcloud snap</a>, 
+            as it is well supported on Ubuntu and contains useful features for generating and restoring server backups.
+        </p>
+
+        <p>
+            First we install the Nextcloud snap with 
+        </p>
+
+        <code class="code_block">
+            $ sudo snap install nextcloud
+        </code>
+
+        <p>
+            Next, we need to initialize an admin account for Nextcloud using the IP address of the server that we took 
+            note of in step 1 <code>(192.168.*.*)</code>. On your non-server system, type the local IP address of the 
+            server into your web browser and you should see a Nextcloud login page. This is because Nextcloud is 
+            listening on ports 80 and 443 by default, and accessing it over the web (even just over the local network) 
+            creates a connection with http (or https, if there are ssl certificates). The username and password that you
+            enter here will be the administrator of the server.
+        </p>
+
+        <p>
+            We do this now before we port forward for security reasons. If we port forward first, there is the chance 
+            that an outside user could create an admin account before us on the server. Additionally, once we configure 
+            nginx with a reverse proxy it will only handle client requests properly if accessed via the full web domain 
+            (<code>cloud.domainname.com</code>), not from a local IP address. We will talk more about how nginx works in 
+            step 3.
+        </p>
+
+        <h3>Modifying Nextcloud server configuration</h3>
+
+        <p>
+            Once we have created our Nextcloud admin account by accessing the local IP address of the server, we need to
+            change the http and https ports Nextcloud listens on since nginx itself listens on ports 80 and 443. 
+        </p>
+
+        <code class="code_block">
+            $ sudo snap set nextcloud ports.http=81 ports.https=444
+        </code>
+
+        <p>
+            It is important that you update the list of trusted domains from which you are going to access Nextcloud. 
+            Regardless of whether you will host Nextcloud from a custom domain (<code>cloud.domainname.com</code>) or from
+            your router's reverse DNS (<code>yourdomain.tplinkdns.net</code>) (see step 4), you will need to specify 
+            that address here.
+        </p>
+
+        <code class="code_block">
+            $ sudo snap run nextcloud.occ config:system:set trusted_domains 1 --value=https://cloud.domainname.com
+        </code>
+
+        <p>
+            Additionally, since we are using nginx to proxy requests to our Nextcloud server, we will need to add 
+            <code>localhost (127.0.0.1)</code> to our list of trusted proxies
+        </p>
+
+        <code class="code_block">
+            $ sudo snap run nextcloud.occ config:system:set trusted_proxies 0 --value=127.0.0.1
+        </code>
+
+        <h2>Step 3: nginx site configuration</h2>
+
+        <p>
+            After adjusting our Nextcloud ports, we now need to configure nginx to operate as a reverse proxy to 
+            appropriately handle client requests and ensure that users are being served the expected content. We will 
+            go into the specifics of how and why we are using nginx now.
+        </p>
+
+        <h3>An introduction to proxies</h3>
+
+        <p>
+            Forward and reverse proxies are the two primary ways in which device communications over the internet can 
+            be monitored and controlled. A <strong>forward proxy</strong>, commonly referred to simply as a proxy, sits 
+            between users on a local network and the outside internet and acts on behalf of the internal clients, 
+            forwarding their requests to external servers. The normal workflow of a forward proxy is as follows:
+        </p>
+
+        <ol style="line-height: 1.6">
+            <li>Internal users make a request to the proxy</li>
+            <li>The proxy forwards the request to external servers</li>
+            <li>External servers see the proxy as the client</li>
+            <li>Proxy returns response back to the internal client</li>
+        </ol>
+
+        <p>
+            A <strong>reverse proxy</strong>, on the other hand, sits between external clients and an internal server 
+            and acts on behalf of the server to process the incoming requests from external clients. A reverse 
+            proxy works as follows:
+        </p>
+
+        <ol style="line-height: 1.6">
+            <li>External user makes request to what they think is the final server</li>
+            <li>Reverse proxy receives the request</li>
+            <li>Proxy forward request to appropriate internal server</li>
+            <li>Internal server processes request and returns response through the proxy back to the client</li>
+        </ol>
+
+        <p>
+            Essentially, the biggest difference between forward and reverse proxies is the direction of their protection:
+            forward proxies protect internal clients from external resources, while reverse proxies protect internal 
+            servers from external clients.
+        </p>
+
+        <h3>nginx as a reverse proxy</h3>
+
+        <p>
+            For our Nextcloud server, we use nginx as a reverse proxy for many reasons:
+        </p>
+
+        <ol style="line-height: 1.6">
+            <li>Getting SSL certificates for an nginx reverse proxy is simple, and much easier than integrating https 
+                into Nextcloud directly</li>
+            <li>It's an easy way to redirect all traffic to be SSL-encrypted (with https)</li>
+            <li>The reverse proxy allows us to run more than one type of webserver on the same machine, and nginx 
+                will redirect the incoming requests to the appropriate backend based on the URL of the content being 
+                accessed
+            </li>
+        </ol>
+
+        <h3>Installing and configuring nginx</h3>
+
+        <p>
+            We begin by installing nginx with
+        </p>
+
+        <code class="code_block">
+            $ sudo apt install nginx
+        </code>
+
+        <p>
+            Next, we need to create a site in <code>/etc/nginx/sites-available/</code>, which we are going to call 
+            <code>cloud</code>. This will allow us to access Nextcloud from the web using <code>cloud.domainname.com</code>
+            . Note that creating and modifying this file will require sudo.
+        </p>
+
+        <code class="code_block">
+            server { <br>
+                <div>
+                server_name cloud.domainname.com; # modify this to match the domain name of your server!<br>
+                <br> 
+                listen 80; <br>
+                <br>
+                location / { <br>
+                    <div>
+                    proxy_pass http://localhost:81; <br>
+                    proxy_set_header Host $http_host; <br>
+                    proxy_set_header X-Real-IP $remote_addr; <br>
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; <br>
+                    proxy_set_header X-Forwarded-Proto $scheme; <br>
+                    proxy_redirect off; <br>
+                    </div>
+                } <br>
+                <br>
+                fastcgi_request_buffering off; <br>
+                client_max_body_size 2048m; <br>
+                </div>
+            }
+        </code>
+
+        <p>
+            You must enable your site by creating a link from sites-available to sites-enabled with 
+        </p>
+
+        <code class="code_block">
+            $ sudo ln -s /etc/nginx/sites-available/cloud /etc/nginx/sites-enabled/
+        </code>
+
+        <p>
+            and ensure that nginx is running with 
+        </p>
+
+        <code class="code_block">
+            $ sudo systemctl enable nginx <br>
+            $ sudo systemctl restart nginx
+        </code>
+
+        <h2>Step 4: Port forwarding and DNS configuration</h2>
+
+        <p>
+            Before we can do certbot, we need to forward our http and https ports on the router so that connections 
+            outside of the local network have access to your Nextcloud server. This will require you to log into your 
+            router, likely through 192.168.1.1 or something similar. The "default gateway" entry in your device network
+            settings will likely point you to the local IP address of your router. 
+        </p>
+
+        <p>
+            From your router, go the the WAN settings and find port forwarding. You will want to forward ports 80 and 
+            443 on the local IP address corresponding to the device on which your Nextcloud server is running. If your 
+            router asks for a choice on which protocol, TCP is just fine.
+        </p>
+
+        <p>
+            You will also need to set up reverse DNS here, so that you know the IP address of your house. Many routers 
+            support this feature with something called Dynamic Domain Name System (DDNS), granting you access to the 
+            router with a registered domain name like <code>yourdomain.tplinkdns.net</code> or 
+            <code>yourdomain.asuscomm.com</code>. If your router has this feature, set it up. Otherwise, there are 3rd 
+            party services which provide a similar reverse DNS functionality.
+        </p>
+
+        <p>
+            If you already have a domain name (which you should, since they are quite useful and inexpensive), you can 
+            use it here to create a CNAME record for <code>cloud.domainname.com</code> which points to 
+            <code>yourdomain.tplinkdns.net</code> or whatever your reverse DNS address is. If you don't have a domain 
+            name and don't want to buy one, you can change the hostname in your nginx configuration to be your reverse 
+            DNS address. You are limited to hosting only one webserver per reverse DNS address, though, but it will 
+            work. Domain names are only ~$12/year, so I would recommend acquiring one. I use Cloudflare for 
+            <code>juliancalder.dev</code>, and it works great.
+        </p>
+
+        <h2>Step 5: certbot configuration</h2>
+
+        <p>
+            We use certbot to easily generate signed SSL certificates for our sites, allowing browsers to authenticate 
+            over HTTPS thus encrypting data to and from the site. First, we must ensure we have certbot installed with
+        </p>
+
+        <code class="code_block">
+            $ sudo snap install certbot --classic
+        </code>
+
+        <p>
+            Note that if you aren't on Ubuntu, you have to make sure you have set up the symlink to allow classic snaps 
+            to be in your path -- see <a href="https://snapcraft.io/docs/installing-snapd">the snap documentation here</a>.
+        </p>
+
+        <p>
+            Certbot will look for any websites accessible over http and give you a list from which you can choose which 
+            ones you want to generate SSL certificates for. You can run the command below and it should automatically 
+            detect and generate certificates for your site, after which time your site should be securely accessible 
+            at <code>cloud.yourdomain.com</code>
+        </p>
+
+        <code class="code_block">
+            $ sudo certbot --nginx
+        </code>
+
+        <h2>Step 6 (optional): Importing a Nextcloud backup</h2>
+
+        <p>
+            The snap version of Nextcloud has a very useful feature enabling you to import a backup of a preexisting 
+            server, making it much easier to migrate your server to new hardware (as I did when upgrading from a 
+            Raspberry Pi to my new 2700x-powered system). You can import the backup with
+        </p>
+
+        <code class="code_block">
+            $ sudo nextcloud.import /path/to/your/backup
+        </code>
+
+        <p>
+            Before you do this, though, it is important that you verify that your backup is somewhere the Nextcloud 
+            snap can read it, and that the backup is owned by root. Snaps are fully sandboxed applications, so they are 
+            self-contained applications which only have access to the files and resources they need to operate. The 
+            Nextcloud snap only has access to the internet and the ability to bind to a port, and importantly does not
+            have access to the filesystem outside of its own namespace (including <code>/var/snap/nextcloud/</code>). 
+            Therefore, you need to move your backup to somewhere in the filesystem that Nextcloud will be able to
+            access it
+        </p>
+
+        <code class="code_block">
+            $ sudo mv /path/to/your/backup /var/snap/nextcloud/common/backup <br>
+            $ sudo chown -R root:root /var/snap/nextcloud/common/backup
+        </code>
+
+        <p>
+            It may take a while to restore this backup depending on the size of the file, but once it is finished you 
+            should be able to use your devices syncing to the server without any interruptions. Once your backup has 
+            been imported, you can safely delete it (unless you want to hold onto it for some reason).
+        </p>
+
+        <h2>Conclusion</h2>
+
+        <p>
+            If you followed the steps above, you should now have an operational Nextcloud server! Depending on your 
+            operating system, there are different Nextcloud desktop applications which will allow you to fairly 
+            seamlessly integrate this cloud backup functionality into your existing desktop ecosystem. If possible, 
+            I would recommend making symlinks from <code>Nextcloud/Documents, Pictures, Music, etc</code> to your 
+            home directory to take full advantage of the integration.
+        </p>
+
+        <p>
+            Note that it could take some time to sync all of your files the first time your server becomes operational. 
+            I've had success syncing all of my files from my primary system, and then using a command like 
+            <code>rsync</code> to transfer my files to other systems on my home network to take full advantage of 
+            hardware-limited ethernet transfer speeds.
+        </p>
+
+        <h2>References</h2>
+
+        <p>
+            This post (and this entire website, honestly) would not have been possible without the help of my brother 
+            Oliver (<a href="https://calder.dev">calder.dev</a>). The Nextcloud git repo and forums also provided insight
+            into some specific server configuration commands.
+        </p>
+
+        <br>
+        <br>
+        <br>
+
+
+	</div>
+
+</body>
+</html> 

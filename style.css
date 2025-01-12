@@ -32,6 +32,20 @@ body {
 	padding-bottom: 45px;
 }
 
+code {
+	font-size: 16px;
+	background-color: #000000
+}
+
+.code_block {
+	display: block;
+	padding: 15px;
+}
+
+.code_block div {
+	margin-left: 24px;
+}
+
 .content {
 	width: 100%;
 	margin: 0;
